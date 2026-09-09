@@ -357,10 +357,27 @@ func roninObjects(w http.ResponseWriter, req *http.Request) {
 		query += " AND extraFlags NOT LIKE '%ANTI-GOOD%' AND extraFlags NOT LIKE '%ANTI-EVIL%' AND extraFlags NOT LIKE '%ANTI-NEUTRAL%'"
 	}
 
-	if classReq != "" && classReq != "All" {
-		antiClass := "%ANTI-" + strings.ToUpper(classReq) + "%"
+	classAntiTags := map[string]string{
+		"Mage":         "%ANTI-MAGIC_USER%",
+		"Warrior":      "%ANTI-WARRIOR%",
+		"Thief":        "%ANTI-THIEF%",
+		"Paladin":      "%ANTI-PALADIN%",
+		"Nomad":        "%ANTI-NOMAD%",
+		"Ninja":        "%ANTI-NINJA%",
+		"Commando":     "%ANTI-COMMANDO%",
+		"Cleric":       "%ANTI-CLERIC%",
+		"Bard":         "%ANTI-BARD%",
+		"Anti-Paladin": "%ANTI-ANTI-PALADIN%",
+	}
+
+	if classReq == "No-Anti" {
+		for _, tag := range classAntiTags {
+			query += " AND extraFlags NOT LIKE ?"
+			args = append(args, tag)
+		}
+	} else if tag, ok := classAntiTags[classReq]; ok {
 		query += " AND extraFlags NOT LIKE ?"
-		args = append(args, antiClass)
+		args = append(args, tag)
 	}
 
 	if tinyworldChecked && len(tinyworldZones) > 0 {
@@ -518,13 +535,14 @@ func roninObjects(w http.ResponseWriter, req *http.Request) {
 		sel(wear, "TAKE"), sel(wear, "FINGER"), sel(wear, "NECK"), sel(wear, "BODY"), sel(wear, "HEAD"), sel(wear, "LEGS"), sel(wear, "FEET"), sel(wear, "HANDS"), sel(wear, "ARMS"), sel(wear, "SHIELD"), sel(wear, "ABOUT"), sel(wear, "WAIST"), sel(wear, "WRIST"), sel(wear, "WIELD"), sel(wear, "HOLD"))
 
 	fmt.Fprintf(w, `<div class="filter-group"><label>Class</label><select name="class">
-				<option>All</option>
-				<option %s>Mage</option><option %s>Warrior</option><option %s>Thief</option>
-				<option %s>Paladin</option><option %s>Nomad</option><option %s>Ninja</option>
-				<option %s>Commando</option><option %s>Cleric</option><option %s>Bard</option>
-				<option %s>Anti-Paladin</option>
-			</select></div>`,
-		sel(classReq, "Mage"), sel(classReq, "Warrior"), sel(classReq, "Thief"), sel(classReq, "Paladin"), sel(classReq, "Nomad"), sel(classReq, "Ninja"), sel(classReq, "Commando"), sel(classReq, "Cleric"), sel(classReq, "Bard"), sel(classReq, "Anti-Paladin"))
+			<option>All</option>
+			<option %s>No-Anti</option>
+			<option %s>Mage</option><option %s>Warrior</option><option %s>Thief</option>
+			<option %s>Paladin</option><option %s>Nomad</option><option %s>Ninja</option>
+			<option %s>Commando</option><option %s>Cleric</option><option %s>Bard</option>
+			<option %s>Anti-Paladin</option>
+		</select></div>`,
+		sel(classReq, "No-Anti"), sel(classReq, "Mage"), sel(classReq, "Warrior"), sel(classReq, "Thief"), sel(classReq, "Paladin"), sel(classReq, "Nomad"), sel(classReq, "Ninja"), sel(classReq, "Commando"), sel(classReq, "Cleric"), sel(classReq, "Bard"), sel(classReq, "Anti-Paladin"))
 
 	fmt.Fprintf(w, `<div class="filter-group"><label>Alignment</label><select name="alignment">
 				<option value="">None</option>
