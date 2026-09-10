@@ -300,6 +300,10 @@ func roninObjects(w http.ResponseWriter, req *http.Request) {
 	if zone != "" && zone != "All" {
 		query += " AND zone = ?"
 		args = append(args, zone)
+	} else {
+		//Hide 00Gear/Boards/Clan Halls items unless the zone dropdown explicitly selects them
+		query += " AND zone != ? AND zone != ? AND zone != ?"
+		args = append(args, "00Gear", "Boards", "Clan Halls")
 	}
 	if affFlag != "" && affFlag != "All" {
 		query += " AND (objAffFlags = ? OR objAffFlags LIKE ? OR objAffFlags LIKE ? OR objAffFlags LIKE ?)"
@@ -763,7 +767,6 @@ func objectDetail(w http.ResponseWriter, req *http.Request) {
 				"recipeRequires2": true,
 				"recipeRequires3": true,
 				"recipeCreates":   true,
-				"aqOrderRequires": true,
 			}
 
 			if valStr != "-" && targetCols[colName] {
@@ -783,6 +786,23 @@ func objectDetail(w http.ResponseWriter, req *http.Request) {
 			}
 
 			fmt.Fprintf(w, "<tr><th>%s</th><td>%s</td></tr>", colName, valStr)
+		}
+
+		//Mobs that load this item (zone reset G/E lines reference the last M/F/R mobile)
+		loaderRows, lerr := db.Query(`SELECT DISTINCT z.ZoneName, m.mobShortDesc, m.mobNumber FROM zones z JOIN mobs m ON m.zoneNumber = z.ZoneNumber AND m.mobNumber = z.spawnItemMobID WHERE z.spawnItemID = ? AND z.spawnItemType IN ('ObjectToMob', 'ObjectToMobEQ')`, id)
+		if lerr == nil {
+			var loaderLinks []string
+			for loaderRows.Next() {
+				var zoneName, mobShortDesc, mobNumber string
+				if loaderRows.Scan(&zoneName, &mobShortDesc, &mobNumber) != nil {
+					continue
+				}
+				loaderLinks = append(loaderLinks, fmt.Sprintf("<a class='item-ref' href='/ronin/Mobiles/Detail?id=%s'>%s</a> [%s]", mobNumber, strings.TrimSpace(mobShortDesc), zoneName))
+			}
+			loaderRows.Close()
+			if len(loaderLinks) > 0 {
+				fmt.Fprintf(w, "<tr><th>Loaded By</th><td>%s</td></tr>", strings.Join(loaderLinks, ", "))
+			}
 		}
 	} else {
 		fmt.Fprintf(w, "<tr><td colspan='2'>No record found for ID %s</td></tr>", id)
