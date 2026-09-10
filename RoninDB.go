@@ -350,7 +350,7 @@ func roninObjects(w http.ResponseWriter, req *http.Request) {
 		query += " AND extraFlags NOT LIKE '%ANTI-RENT%'"
 	}
 	if excludeQuestwear {
-		query += " AND wearFlags NOT LIKE '%QUESTWEAR%'"
+		query += " AND wearFlags NOT LIKE '%QUESTWEAR%' AND zone NOT LIKE 'Quest Gear%'"
 	}
 
 	if alignment == "Good" {
