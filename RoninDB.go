@@ -60,14 +60,79 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8081", nil))
 }
 
+const themeCSS = `
+	:root {
+		color-scheme: light;
+		--bg:#f4f7f6;
+		--surface:#ffffff;
+		--surface-alt:#f8f9fa;
+		--text:#333333;
+		--muted:#70757a;
+		--border:#dfe1e5;
+		--row-border:#f1f3f4;
+		--header-bg:#2c3e50;
+		--header-text:#ffffff;
+		--hover:#f1f1f1;
+		--accent:#1a73e8;
+		--danger:#c5221f;
+		--success:#188038;
+		--purple:#704085;
+		--flags:#999999;
+	}
+	html[data-theme="dark"] {
+		color-scheme: dark;
+		--bg:#0f1419;
+		--surface:#1a2129;
+		--surface-alt:#222b35;
+		--text:#e6e8ea;
+		--muted:#9aa0a6;
+		--border:#3a4450;
+		--row-border:#2a333e;
+		--header-bg:#33475c;
+		--header-text:#ffffff;
+		--hover:#242e39;
+		--accent:#8ab4f8;
+		--danger:#f28b82;
+		--success:#81c995;
+		--purple:#c58af9;
+		--flags:#8a9096;
+	}
+	#themeToggle { position:fixed; top:16px; right:16px; z-index:1000; padding:8px 14px; border:1px solid var(--border); border-radius:4px; background:var(--surface); color:var(--text); font-size:0.85rem; cursor:pointer; }
+	#themeToggle:hover { border-color:var(--accent); color:var(--accent); }`
+
+func themeFromRequest(req *http.Request) string {
+	if c, err := req.Cookie("theme"); err == nil && (c.Value == "dark" || c.Value == "light") {
+		return c.Value
+	}
+	return "light"
+}
+
+func themeToggle(theme string) string {
+	label := "Dark"
+	if theme == "dark" {
+		label = "Light"
+	}
+	return fmt.Sprintf(`<button id="themeToggle" onclick="toggleTheme()" title="Toggle dark mode">%s</button>
+<script>
+function toggleTheme() {
+	var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+	document.documentElement.setAttribute("data-theme", next);
+	document.cookie = "theme=" + next + "; path=/; max-age=31536000; SameSite=Lax";
+	document.getElementById("themeToggle").textContent = next === "dark" ? "Light" : "Dark";
+}
+</script>`, label)
+}
+
 // --- Menu Handlers ---
 
 func landingPage(w http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(w, `<html><body><a href="/ronin">Ronin mud data</a><br><a href="/files">Files</a></body></html>`)
+	theme := themeFromRequest(req)
+	fmt.Fprintf(w, `<html data-theme="%s"><head><style>%s</style></head><body>%s<a href="/ronin">Ronin mud data</a><br><a href="/files">Files</a></body></html>`, theme, themeCSS, themeToggle(theme))
 }
 
 func ronin(w http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(w, `<html><body><h1>Ronin Database</h1><a href="/ronin/Mobiles">Mobiles</a><br><a href="/ronin/Objects">Objects</a><br><a href="/ronin/Zones">Zones & Maps</a></body></html>`)
+	theme := themeFromRequest(req)
+	fmt.Fprintf(w, `<html data-theme="%s"><head><style>%s</style></head><body>%s<h1>Ronin Database</h1><a href="/ronin/Mobiles">Mobiles</a><br><a href="/ronin/Objects">Objects</a><br><a href="/ronin/Zones">Zones & Maps</a></body></html>`, theme, themeCSS, themeToggle(theme))
 }
 
 // --- Mobile Handlers ---
@@ -117,22 +182,23 @@ func roninMobiles(w http.ResponseWriter, req *http.Request) {
 	if tinyworldChecked {
 		twChecked = "checked"
 	}
+	theme := themeFromRequest(req)
 
 	// Updated scan variables to match reordered SELECT
 	var zone, id, name, keys, lvl, hp, exp, coins, coinExp, totalExp string
 
-	fmt.Fprintf(w, `<html><head><style>
-		body{font-family:sans-serif; padding:20px; background:#f4f7f6;}
-		table{border-collapse:collapse; width:100%%; background:white; box-shadow:0 2px 5px rgba(0,0,0,0.1);}
-		th, td{border:1px solid #ddd; padding:12px; text-align:left;}
-		th{background:#2c3e50; color:white; cursor:pointer; text-transform:uppercase; font-size:0.8rem;}
-		tr:hover{background:#f1f1f1;}
+	fmt.Fprintf(w, `<html data-theme="%s"><head><style>%s
+		body{font-family:sans-serif; padding:20px; background:var(--bg); color:var(--text);}
+		table{border-collapse:collapse; width:100%%; background:var(--surface); box-shadow:0 2px 5px rgba(0,0,0,0.1);}
+		th, td{border:1px solid var(--border); padding:12px; text-align:left;}
+		th{background:var(--header-bg); color:var(--header-text); cursor:pointer; text-transform:uppercase; font-size:0.8rem;}
+		tr:hover{background:var(--hover);}
 		.search-box { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
-		input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 300px; }
+		input[type="text"] { padding: 8px; border: 1px solid var(--border); border-radius: 4px; width: 300px; background:var(--surface); color:var(--text); }
 		.btn { padding: 8px 15px; background: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; }
-		.back-link { display: inline-block; margin-bottom: 15px; color: #666; text-decoration: none; }
+		.back-link { display: inline-block; margin-bottom: 15px; color: var(--muted); text-decoration: none; }
 		.checkbox-group { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; }
-	</style></head><body>
+	</style></head><body>%s
 	<a href="/ronin" class="back-link">← Back to Menu</a>
 	<h1>Mobiles</h1>
 
@@ -156,7 +222,7 @@ func roninMobiles(w http.ResponseWriter, req *http.Request) {
 		<th onclick="sortTable(6)">Coins</th>
 		<th onclick="sortTable(7)">Coin Exp</th>
 		<th onclick="sortTable(8)">Total Exp</th>
-	</tr></thead><tbody>`, search, twChecked)
+	</tr></thead><tbody>`, theme, themeCSS, themeToggle(theme), search, twChecked)
 
 	if search != "" || tinyworldChecked {
 		for rows.Next() {
@@ -428,45 +494,46 @@ func roninObjects(w http.ResponseWriter, req *http.Request) {
 	if excludeQuestwear {
 		questwearChecked = "checked"
 	}
+	theme := themeFromRequest(req)
 
 	fmt.Fprintf(w, `
-	<html>
+	<html data-theme="%s">
 	<head>
 		<title>Ronin Object Search</title>
-		<style>
-			body { font-family: -apple-system, sans-serif; background: #fff; color: #333; margin: 0; }
+		<style>%s
+			body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
 			.container { max-width: 1600px; margin: 0 auto; padding: 40px 20px; }
 			.filter-panel { 
-				background: #f8f9fa; padding: 20px; border-radius: 8px; 
+				background: var(--surface-alt); padding: 20px; border-radius: 8px; 
 				display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;
-				margin-bottom: 30px; border: 1px solid #dfe1e5;
+				margin-bottom: 30px; border: 1px solid var(--border);
 			}
 			.filter-group { display: flex; flex-direction: column; text-align: left; }
-			.filter-group label { font-size: 0.7rem; font-weight: bold; color: #70757a; margin-bottom: 5px; text-transform: uppercase; }
-			.checkbox-group { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #70757a; margin-bottom: 8px;}
-			input, select { padding: 8px; border: 1px solid #dfe1e5; border-radius: 4px; font-size: 0.9rem; }
+			.filter-group label { font-size: 0.7rem; font-weight: bold; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; }
+			.checkbox-group { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: var(--muted); margin-bottom: 8px;}
+			input, select { padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.9rem; background: var(--surface); color: var(--text); }
 			.btn-search { background: #1a73e8; color: white; border: none; padding: 9px 20px; cursor: pointer; border-radius: 4px; font-weight: 500; }
-			.back-link { color: #70757a; text-decoration: none; font-size: 0.9rem; display: inline-block; margin-bottom: 20px; }
+			.back-link { color: var(--muted); text-decoration: none; font-size: 0.9rem; display: inline-block; margin-bottom: 20px; }
 			
 			table { width: 100%%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
-			th { border-bottom: 2px solid #f1f3f4; padding: 12px 8px; cursor: pointer; color: #70757a; font-size: 0.65rem; text-transform: uppercase; }
-			th:hover { background: #f1f3f4; color: #1a73e8; }
-			td { border-bottom: 1px solid #f1f3f4; padding: 10px 8px; }
-			tr:hover { background: #f8f9fa; }
-			.dmg-val { color: #c5221f; font-weight: bold; }
-			.aff-val { color: #188038; font-weight: bold; }
-			.spell-val { color: #704085; font-style: italic; }
-			.flags-text { color: #999; font-size: 0.7rem; }
-			.item-link { color: #1a73e8; text-decoration: none; font-weight: 500; }
+			th { border-bottom: 2px solid var(--row-border); padding: 12px 8px; cursor: pointer; color: var(--muted); font-size: 0.65rem; text-transform: uppercase; }
+			th:hover { background: var(--hover); color: var(--accent); }
+			td { border-bottom: 1px solid var(--row-border); padding: 10px 8px; }
+			tr:hover { background: var(--hover); }
+			.dmg-val { color: var(--danger); font-weight: bold; }
+			.aff-val { color: var(--success); font-weight: bold; }
+			.spell-val { color: var(--purple); font-style: italic; }
+			.flags-text { color: var(--flags); font-size: 0.7rem; }
+			.item-link { color: var(--accent); text-decoration: none; font-weight: 500; }
 		</style>
 	</head>
-	<body>
+	<body>%s
 		<div class="container">
 			<a href="/ronin" class="back-link">← Back to Menu</a>
 			<h1>Object Search</h1>
 			
 			<form method="GET" action="/ronin/Objects" class="filter-panel">
-				<div class="filter-group"><label>Keywords</label><input type="text" name="search" value="%s"></div>`, search)
+				<div class="filter-group"><label>Keywords</label><input type="text" name="search" value="%s"></div>`, theme, themeCSS, themeToggle(theme), search)
 
 	fmt.Fprintf(w, `<div class="filter-group"><label>Item Type</label><select name="type"><option>All</option>`)
 	for _, t := range allTypes {
@@ -719,19 +786,20 @@ func objectDetail(w http.ResponseWriter, req *http.Request) {
 
 	cols, _ := rows.Columns()
 
-	fmt.Fprintf(w, `<html><head><style>
-		body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
-		.detail-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+	theme := themeFromRequest(req)
+	fmt.Fprintf(w, `<html data-theme="%s"><head><style>%s
+		body { font-family: sans-serif; padding: 20px; background: var(--bg); color: var(--text); }
+		.detail-card { background: var(--surface); padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
 		table { width: 100%%; border-collapse: collapse; margin-top: 20px; }
-		th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-		th { background: #f8f9fa; color: #555; width: 30%%; }
-		.back-btn { text-decoration: none; color: #1a73e8; font-weight: bold; }
-		.item-ref { color: #1a73e8; text-decoration: none; font-weight: bold; border-bottom: 1px dashed #1a73e8; }
-	</style></head><body>
+		th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--row-border); }
+		th { background: var(--surface-alt); color: var(--muted); width: 30%%; }
+		.back-btn { text-decoration: none; color: var(--accent); font-weight: bold; }
+		.item-ref { color: var(--accent); text-decoration: none; font-weight: bold; border-bottom: 1px dashed var(--accent); }
+	</style></head><body>%s
 	<div class="detail-card">
 		<a href="javascript:history.back()" class="back-btn">← Back</a>
 		<h1>Object Detail: %s</h1>
-		<table>`, id)
+		<table>`, theme, themeCSS, themeToggle(theme), id)
 
 	if rows.Next() {
 		values := make([]interface{}, len(cols))
@@ -826,19 +894,20 @@ func roninZones(w http.ResponseWriter, req *http.Request) {
 	}
 	defer rows.Close()
 
+	theme := themeFromRequest(req)
 	fmt.Fprintf(w, `
-	<html>
+	<html data-theme="%s">
 	<head>
-		<style>
-			body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
-			table { border-collapse: collapse; width: 100%%; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-			th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-			th { background: #2c3e50; color: white; cursor: pointer; text-transform:uppercase; font-size: 0.8rem; }
-			tr:hover { background: #f1f1f1; }
-			.back-link { display: inline-block; margin-bottom: 15px; color: #666; text-decoration: none; }
+		<style>%s
+			body { font-family: sans-serif; padding: 20px; background: var(--bg); color: var(--text); }
+			table { border-collapse: collapse; width: 100%%; background: var(--surface); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+			th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+			th { background: var(--header-bg); color: var(--header-text); cursor: pointer; text-transform:uppercase; font-size: 0.8rem; }
+			tr:hover { background: var(--hover); }
+			.back-link { display: inline-block; margin-bottom: 15px; color: var(--muted); text-decoration: none; }
 		</style>
 	</head>
-	<body>
+	<body>%s
 		<a href="/ronin" class="back-link">← Back to Menu</a>
 		<h1>Zones</h1>
 
@@ -851,7 +920,7 @@ func roninZones(w http.ResponseWriter, req *http.Request) {
 					<th onclick="sortTable(3)">Map</th>
 				</tr>
 			</thead>
-			<tbody>`)
+			<tbody>`, theme, themeCSS, themeToggle(theme))
 
 	for rows.Next() {
 		var id, name, room string
@@ -941,12 +1010,13 @@ func zoneDetail(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	fmt.Fprintf(w, `<html><head><style>
-		body{font-family:sans-serif; padding:20px; background:#f0f2f5;}
-		.card{background:white; padding:20px; border-radius:8px; margin-bottom:20px; box-shadow:0 2px 5px rgba(0,0,0,0.1);}
-		.data-list{background:#eef2f7; padding:10px; border-radius:5px; margin:10px 0; word-wrap:break-word;}
+	theme := themeFromRequest(req)
+	fmt.Fprintf(w, `<html data-theme="%s"><head><style>%s
+		body{font-family:sans-serif; padding:20px; background:var(--bg); color:var(--text);}
+		.card{background:var(--surface); padding:20px; border-radius:8px; margin-bottom:20px; box-shadow:0 2px 5px rgba(0,0,0,0.1);}
+		.data-list{background:var(--surface-alt); padding:10px; border-radius:5px; margin:10px 0; word-wrap:break-word;}
 		.label{font-weight:bold; width:180px; display:inline-block;}
-	</style></head><body>`)
+	</style></head><body>%s`, theme, themeCSS, themeToggle(theme))
 
 	fmt.Fprintf(w, "<h1>Zone %s: %s</h1><a href='/ronin/Zones'>Back</a>", zoneID, zoneName)
 
@@ -996,18 +1066,19 @@ func detailView(w http.ResponseWriter, req *http.Request, table, idCol, title st
 
 	cols, _ := rows.Columns()
 
-	fmt.Fprintf(w, `<html><head><style>
-		body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
-		.detail-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+	theme := themeFromRequest(req)
+	fmt.Fprintf(w, `<html data-theme="%s"><head><style>%s
+		body { font-family: sans-serif; padding: 20px; background: var(--bg); color: var(--text); }
+		.detail-card { background: var(--surface); padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
 		table { width: 100%%; border-collapse: collapse; margin-top: 20px; }
-		th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-		th { background: #f8f9fa; color: #555; width: 30%%; }
-		.back-btn { text-decoration: none; color: #1a73e8; font-weight: bold; }
-	</style></head><body>
+		th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--row-border); }
+		th { background: var(--surface-alt); color: var(--muted); width: 30%%; }
+		.back-btn { text-decoration: none; color: var(--accent); font-weight: bold; }
+	</style></head><body>%s
 	<div class="detail-card">
 		<a href="javascript:history.back()" class="back-btn">← Back</a>
 		<h1>%s Detail: %s</h1>
-		<table>`, title, id)
+		<table>`, theme, themeCSS, themeToggle(theme), title, id)
 
 	if rows.Next() {
 		values := make([]interface{}, len(cols))
@@ -1068,22 +1139,23 @@ func files(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	theme := themeFromRequest(req)
 	fmt.Fprintf(w, `
-	<html>
+	<html data-theme="%s">
 	<head>
 		<title>File Index</title>
-		<style>
-			body { font-family: -apple-system, sans-serif; padding: 40px; background: #f8f9fa; }
-			.container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-			h1 { font-weight: 300; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+		<style>%s
+			body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
+			.container { max-width: 800px; margin: 0 auto; background: var(--surface); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+			h1 { font-weight: 300; border-bottom: 2px solid var(--row-border); padding-bottom: 10px; }
 			table { width: 100%%; border-collapse: collapse; margin-top: 20px; }
-			th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-			th { background: #f1f3f4; color: #5f6368; font-size: 0.8rem; text-transform: uppercase; }
-			.file-link { color: #1a73e8; text-decoration: none; font-weight: 500; }
+			th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--row-border); }
+			th { background: var(--surface-alt); color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+			.file-link { color: var(--accent); text-decoration: none; }
 			.file-link:hover { text-decoration: underline; }
 		</style>
 	</head>
-	<body>
+	<body>%s
 		<div class="container">
 			<a href="/ronin" style="color: #70757a; text-decoration: none; font-size: 0.9rem;">← Back to Ronin DB</a>
 			<h1>Downloads</h1>
@@ -1095,7 +1167,7 @@ func files(w http.ResponseWriter, req *http.Request) {
 						<th>Action</th>
 					</tr>
 				</thead>
-				<tbody>`)
+			<tbody>`, theme, themeCSS, themeToggle(theme))
 
 	for _, entry := range entries {
 		if entry.IsDir() {
