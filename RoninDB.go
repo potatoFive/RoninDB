@@ -50,6 +50,9 @@ func main() {
 
 	http.HandleFunc("/files", files)
 
+	// Damage Simulator
+	http.HandleFunc("/simulator", simulator)
+
 	// Static Map Serving
 	http.Handle("/map/", http.StripPrefix("/map/", http.FileServer(http.Dir("map"))))
 
@@ -127,7 +130,7 @@ function toggleTheme() {
 
 func landingPage(w http.ResponseWriter, req *http.Request) {
 	theme := themeFromRequest(req)
-	fmt.Fprintf(w, `<html data-theme="%s"><head><style>%s</style></head><body>%s<a href="/ronin">Ronin mud data</a><br><a href="/files">Files</a></body></html>`, theme, themeCSS, themeToggle(theme))
+	fmt.Fprintf(w, `<html data-theme="%s"><head><style>%s</style></head><body>%s<a href="/ronin">Ronin mud data</a><br><a href="/files">Files</a><br><a href="/simulator">Damage Simulator</a></body></html>`, theme, themeCSS, themeToggle(theme))
 }
 
 func ronin(w http.ResponseWriter, req *http.Request) {
@@ -1192,6 +1195,16 @@ func files(w http.ResponseWriter, req *http.Request) {
 		</div>
 	</body>
 	</html>`)
+}
+
+func simulator(w http.ResponseWriter, req *http.Request) {
+	data, err := os.ReadFile("simulator/index.html")
+	if err != nil {
+		http.Error(w, "Unable to load simulator page", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
 }
 
 // initTinyworld reads the tinyworld.idx file once at startup and caches the zone names.

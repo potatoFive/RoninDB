@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ronin MUD - Group Damage Simulator (600s)</title>
+<style>
+  :root {
+    --bg: #12141a; --panel: #1b1f2a; --panel2: #232838; --border: #323a52;
+    --text: #dce1ec; --dim: #8b93a7; --accent: #e0b34c; --accent2: #5aa9e6;
+    --good: #6fce7f; --bad: #e06c6c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: var(--bg); color: var(--text);
+         font-family: "Segoe UI", system-ui, sans-serif; }
+  h1 { font-size: 22px; margin: 0 0 4px; color: var(--accent); }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 20px; }
+  .layout { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .config { width: 340px; flex-shrink: 0; }
+  .results { flex: 1; min-width: 640px; }
+  .member-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .member-row label { width: 78px; color: var(--dim); font-size: 13px; }
+  select, input[type=number] {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 9px; font-size: 14px; width: 100%;
+  }
+  .inputs { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .input-row label { width: 130px; color: var(--dim); font-size: 13px; }
+  button {
+    margin-top: 14px; width: 100%; padding: 11px; font-size: 15px; font-weight: 600;
+    background: var(--accent); color: #1a1408; border: none; border-radius: 8px; cursor: pointer;
+  }
+  button:hover { filter: brightness(1.1); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 9px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--dim); font-weight: 600; background: var(--panel2); position: sticky; top: 0; }
+  td:first-child, th:first-child { text-align: left; }
+  tr.total-row td { font-weight: 700; color: var(--accent); border-top: 2px solid var(--accent); background: var(--panel2); }
+  .bar-wrap { margin-top: 18px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+  .bar-label { width: 150px; color: var(--dim); text-align: right; }
+  .bar-track { flex: 1; background: var(--panel2); border-radius: 4px; height: 18px; overflow: hidden; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, #3d6ea5, var(--accent2)); border-radius: 4px; }
+  .bar-val { width: 110px; color: var(--text); }
+  .actions { font-size: 11px; color: var(--dim); white-space: normal; max-width: 340px; }
+  .assumptions { margin-top: 22px; font-size: 12px; color: var(--dim); line-height: 1.55; }
+  .assumptions b { color: var(--text); }
+  .tag { display: inline-block; background: var(--panel2); border: 1px solid var(--border);
+         border-radius: 4px; padding: 1px 6px; font-size: 11px; color: var(--dim); margin-left: 6px; }
+</style>
+</head>
+<body>
+<h1>Ronin MUD &mdash; Group Damage Simulator</h1>
+<div class="sub">Simulates a group of 5 characters fighting a training dummy for <b>600 seconds</b>, using every skill and spell available to their subclass (subclass level 5, character level 50).</div>
+
+<div class="layout">
+  <div class="panel config">
+    <div id="members"></div>
+    <div class="inputs">
+      <div class="input-row"><label for="melee">Melee_Damage</label><input type="number" id="melee" value="120" min="1"></div>
+      <div class="input-row"><label for="dex">Dexterity</label><input type="number" id="dex" value="25" min="3" max="25"></div>
+      <div class="input-row"><label for="wis">Wisdom</label><input type="number" id="wis" value="25" min="3" max="25"></div>
+      <div class="input-row"><label for="skills">Skills (learned %)</label><input type="number" id="skills" value="127" min="0" max="200"></div>
+      <div class="input-row"><label for="manaregen">Mana_Regen / 60s</label><input type="number" id="manaregen" value="100" min="0"></div>
+    </div>
+    <button id="runBtn">Simulate 600 Seconds</button>
+  </div>
+
+  <div class="panel results">
+    <div id="resultsPlaceholder" style="color:var(--dim); padding: 40px 0; text-align:center;">Select your group and press <b>Simulate</b>.</div>
+    <div id="results" style="display:none">
+      <table id="resultTable"></table>
+      <div style="margin-top:26px">
+        <div style="color:var(--dim); font-size:13px; font-weight:600; margin-bottom:8px">All subclasses (solo, same inputs &mdash; group buffs only affect themselves)</div>
+        <table id="soloTable"></table>
+      </div>
+      <div class="bar-wrap" id="bars"></div>
+    </div>
+  </div>
+</div>
+
+<div class="assumptions panel" style="margin-top:20px">
+  <b>Model assumptions (from ronin/src):</b> combat ticks every 3s (PULSE_VIOLENCE) = 200 rounds in 600s; spell/buff durations are measured in <b>60s ticks</b> (affect_update runs on PULSE_TICK, comm.c:1009), so 1 tick = 20 rounds.
+  Every character makes their basic multi-strike attack <b>every round</b>, plus at most one extra skill/spell/buff action per round.   All skills share <b>one lag timer</b> (WAIT_STATE blocks every command, comm.c:797): after any skill, no other skill can be used until its lag elapses &mdash; circle 3 rounds, banzai 1 round, all others 2 rounds. Backstab only works on an unengaged target, so it can be used <b>once per fight</b>. Quick Recovery (Rogue SC5) cuts skill lag by 1 with chance(number(50,75)) &asymp; expected &minus;0.625 rounds, letting the Rogue circle ~84 times in 200 rounds. So headbutt and flank must alternate (~50 each = ~100 total uses); only banzai (1-round lag) can fire every round, and it also grants one extra full basic-attack round on use. Rogue&rsquo;s Circle can Trip the target (SC4, toggle assumed on): a separate number(1,111) check after a successful circle that stuns on success.
+  Target is a standing, full-HP dummy: every attack has a <b>5% chance to miss</b> (95% hit rate; a miss stops the multi-strike chain), no saving throws (all subclass spells use SAVING_NONE).
+  Stunning skills (Pummel, Backfist, Tigerkick, Headbutt, Smite) leave the target STUNNED so the next attack deals <b>&times;2</b> damage (Iron Fist Punch &times;1.55 expected: 67% sitting &times;1.333 + 33% stun &times;2); Bash sets it resting (&times;1.5); Batter sets it sitting (&times;1.333); Clobber averages &times;2.21 over its random victim states.
+  Aid (Chanter SC4) is cast on the whole group: +10% of all damage to all 5 members for 5 ticks (100 rounds). War Chant &times;1.2 (dummy isn't war-chantered), Magic Armament +2d5, Might +3 damroll 20 ticks, Righteousness +1d4 10 ticks, Rage &times;1.5 all damage 5 ticks (cast as soon as affordable), Frenzy &times;1.5 weapon damage, Tranquility +3 hit/dam 6 ticks, Mystic Swiftness 4 ticks, Blade Dance deals 350 + one full basic attack and refreshes Bladesinging (+40 damroll) for 10 rounds, each Shadow Wraith shadow lasts 10 ticks (200 rounds).
+  Buffs don't stack: Aid, War Chant and Divine Hammer can only be recast after they expire. Bandit's backstab can only be used once, at the start of the fight.
+  Characters start with <b>one tick of mana regen</b> (the Mana_Regen input; cap 1000) and gain Mana_Regen every 60s. Skill success uses the source formulas
+  (e.g. <span style="font-family:monospace">number(1,137) &minus; DEX_APP &le; learned</span>) with the Skills/Dexterity/Wisdom inputs;
+  expected values are used instead of random rolls so results are stable. Crits: Nomads 20% + 2%/Dex over 18 (+10 Awareness, +10 Berserk), Ronin Sento Kata 20%; crits double weapon damage only.
+  Multi-strikes use the DUAL/TRIPLE/QUAD skill checks (Skills input) with Juggernaut (Warlord SC4) and Hostile (Gladiator SC5) toggles; Ninja always gets a 2nd hit.
+  Clerics and Bards are assumed under Haste: chance(30 + DEX_APP) of an extra basic attack each round (a missed haste attack stops the chain).
+  Passive toggles assumed on: Fury (both Paladins &times;2.5 weapon damage), Berserk, Frenzy (&times;1.5), Awareness, Hostile, Vehemence, Trusty Steed, Dragon form (Druid). A pummel'd/stunned victim takes &times;2 on the next hit (&times;5 total with Fury). Smite's steed trample is an extra basic attack at &times;2 on the stunned victim and leaves it resting. Snipe never fires vs a full-HP target.
+  Excluded (no corpse / defensive / no dummy interaction): Trophy, Wall of Thorns, Desecrate, Blade Barrier, Blackmantle, Orb, Fortification, Evasion, Defend, Riposte, Feint, Camaraderie, heals.
+</div>
+
+<script>
+"use strict";
+// ============================ Source-derived constants ============================
+const LEVEL = 50;            // max mortal level (LEVEL_MORT, structs.h:85)
+const TOTAL_ROUNDS = 200;    // 600s / 3s per round (PULSE_VIOLENCE)
+const TICK_ROUNDS = 20;      // affect durations tick every 60s (affect_update on PULSE_TICK, comm.c:1009)
+const MAX_MANA = 1000;
+const HIT_CHANCE = 0.95;     // 5% chance to miss on every attack
+
+// dex_app[].prac_bonus (constants.c:1969-1996)
+const DEX_APP_TABLE = [[3,0],[5,0],[8,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,1],[20,2],[21,3],[22,4],[23,6],[24,8],[25,10]];
+// wis_app[].bonus (constants.c:2062-2089)
+const WIS_BONUS_TABLE = [[3,0],[13,0],[14,1],[15,2],[16,3],[17,4],[18,5],[19,6],[20,6],[21,7],[22,7],[23,8],[24,9],[25,10]];
+
+function tableLookup(table, v) {
+  if (v <= table[0][0]) return table[0][1];
+  let out = table[0][1];
+  for (const [k, val] of table) if (v >= k) out = val; else break;
+  return out;
+}
+
+// ============================ Subclass catalog (subclass.c / constants.c) ============================
+const SUBCLASSES = [
+  { key: "enchanter",    label: "Enchanter",    cls: "Magic-User" },
+  { key: "archmage",     label: "Archmage",     cls: "Magic-User" },
+  { key: "druid",        label: "Druid",        cls: "Cleric" },
+  { key: "templar",      label: "Templar",      cls: "Cleric" },
+  { key: "rogue",        label: "Rogue",        cls: "Thief" },
+  { key: "bandit",       label: "Bandit",       cls: "Thief" },
+  { key: "warlord",      label: "Warlord",      cls: "Warrior" },
+  { key: "gladiator",    label: "Gladiator",    cls: "Warrior" },
+  { key: "ronin",        label: "Ronin",        cls: "Ninja" },
+  { key: "mystic",       label: "Mystic",       cls: "Ninja" },
+  { key: "ranger",       label: "Ranger",       cls: "Nomad" },
+  { key: "trapper",      label: "Trapper",      cls: "Nomad" },
+  { key: "cavalier",     label: "Cavalier",     cls: "Paladin" },
+  { key: "crusader",     label: "Crusader",     cls: "Paladin" },
+  { key: "defiler",      label: "Defiler",      cls: "Anti-Paladin" },
+  { key: "infidel",      label: "Infidel",      cls: "Anti-Paladin" },
+  { key: "bladesinger",  label: "Bladesinger",  cls: "Bard" },
+  { key: "chanter",      label: "Chanter",      cls: "Bard" },
+  { key: "legionnaire",  label: "Legionnaire",  cls: "Commando" },
+  { key: "mercenary",    label: "Mercenary",    cls: "Commando" },
+];
+
+// ============================ Character factory ============================
+function makeChar(subKey, inputs, group) {
+  const M = inputs.melee, D = inputs.dexApp, W = inputs.wisBonus, L = inputs.skills;
+  const sub = SUBCLASSES.find(s => s.key === subKey);
+  const c = {
+    key: subKey, label: sub.label, cls: sub.cls,
+    mana: inputs.manaRegen, maxMana: MAX_MANA, // start with one 60s tick of mana regen
+    hits: HIT_CHANCE, crit: 0, dmgMult: 1,
+    skills: [], spells: [], buffs: [],
+    nextSkill: 0, buffEnds: {}, // shared skill lag (WAIT_STATE on the descriptor blocks ALL commands)
+    shadows: 0, maimed: false, hammer: null,
+    totals: { basic: 0, skill: 0, spell: 0, passive: 0 },
+    actionCounts: {},
+  };
+
+  // --- success chances from source formulas (check = number(1,N) - mods <= learned) ---
+  const chance = (N, mods) => Math.max(0, Math.min(1, (L + mods) / N));
+  const pDex   = chance(137, D);                 // backfist/tigerkick/lunge/flank/batter/pummel/banzai (number(1,137)-dex_app)
+  const pStrW  = chance(137, W);                 // smite/zeal (max(str_to_hit=0, wis))
+  const pHeadbutt = chance(137, D);              // headbutt (max(str_to_hit=0, dex_app))
+  const pClobber  = chance(137, D);              // clobber (max(str_to_hit=0, dex_app))
+  const pKick  = chance(101, D);                 // kick/punch (number(1,101)-dex)
+  const pBash  = chance(137, D + (subKey === "templar" ? LEVEL / 5 : 0)); // bash: max(str,dex); Templar SC2 Martial Training -level/5
+  const pBackstab = chance(151, D);              // backstab
+  const pCircle   = chance(197, D + LEVEL / 2 + (subKey === "rogue" ? 5 + D / 2 : subKey === "bandit" ? 10 : 0)); // thief -level/2; +Vehemence(5+dex/2)/Fade(10)
+
+  // --- multi-strike expectations (fight.c:3750-3886), skill=Skills input, dex_app*5 bonus ---
+  // A miss stops the chain: a follow-up is only attempted if the previous attack LANDED,
+  // so expected landed hits = p + p^2*q2 + p^3*q2*q3 + p^4*q2*q3*q4 (p = HIT_CHANCE).
+  const p = HIT_CHANCE;
+  const dualVal = Math.floor((L + 150) / 2) + D * 5;
+  const hasteChance = (30 + D) / 100; // SPELL_HASTE: chance(30 + dex_app) extra basic attack (Clerics & Bards assumed hasted)
+
+  switch (subKey) {
+    // ---------------- Magic-User ----------------
+    case "enchanter": {
+      c.spells.push({ id: "engage", name: "Engage", mana: 40, startOnly: true, ev: () => M * 5, // once per fight, at the start
+        cast: () => { c.mana -= 40; c.totals.spell += M * 5; } });
+      break;
+    }
+    case "archmage": {
+      c.spells.push(
+        { id: "meteor", name: "Meteor", mana: 5, ev: () => 50, cast: () => { c.mana -= 5; c.totals.spell += 50; } },
+        { id: "frostbolt", name: "Frostbolt", mana: 50, ev: () => 350, cast: () => { c.mana -= 50; c.totals.spell += 350; } },
+        { id: "woa", name: "Wrath of the Ancients", mana: 250, ev: () => 1900, cast: () => { c.mana -= 250; c.totals.spell += 1900; } }
+      );
+      break;
+    }
+    // ---------------- Cleric ----------------
+    case "druid": {
+      c.hits = p + hasteChance * p * p; // hasted: 30+dex_app % extra attack, must land to continue
+      c.passiveDragon = true; // dragon form assumed active (SC5); extra hit chance(20+wis) -> +LEVEL dmg
+      c.skills.push({ id: "bash", name: "Bash", cd: 2, posEV: 1.5, ev: () => pBash * 25.5, use: () => { c.totals.skill += pBash * 25.5; } });
+      c.spells.push({ id: "dragonfire", name: "Dragonfire", mana: 75, ev: () => LEVEL * 10, cast: () => { c.mana -= 75; c.totals.spell += LEVEL * 10; } });
+      break;
+    }
+    case "templar": {
+      c.hits = p + hasteChance * p * p; // hasted
+      c.skills.push({ id: "bash", name: "Bash", cd: 2, posEV: 1.5, ev: () => pBash * 25.5, use: () => { c.totals.skill += pBash * 25.5; } });
+      c.buffs.push({ id: "magicarmament", name: "Magic Armament", mana: 75, dur: 5 * TICK_ROUNDS, flat: 7, // 2d5 bonus per weapon attack, 5 ticks
+        ev: () => 7 * c.hits * 5 * TICK_ROUNDS });
+      c.spells.push({ id: "divinehammer", name: "Divine Hammer", mana: 200, dur: 60,
+        ev: () => ((20 + c.flatBonus()) * 60 + 900) * HIT_CHANCE, // extra basic attack each round (5d5+5 avg 20 + damroll) x60 rounds + Judgement Strike 900
+        cast: () => { c.mana -= 200; c.hammer = { endRound: group.round + 60, judged: false }; } });
+      break;
+    }
+    // ---------------- Thief ----------------
+    case "rogue":
+    case "bandit": {
+      if (subKey === "bandit") c.closeCombat = (0.5 + D / 100) * 3; // Bandit SC4 Close Combat: +3 damroll for 3 rounds, chance(50+dex) per backstab/circle
+      c.skills.push(
+        { id: "backstab", name: "Backstab", cd: 3, ev: () => pBackstab * M * 10, use: () => { c.totals.skill += pBackstab * M * 10; } }, // backstab_mult[50]=10
+        { id: "circle",   name: "Circle",   cd: 3, ev: () => pCircle * M * 5, use: () => { c.totals.skill += pCircle * M * 5; } }, // circle_mult[50]=5
+        { id: "kick",     name: "Kick",     cd: 2, ev: () => pKick * LEVEL * 2, use: () => { c.totals.skill += pKick * LEVEL * 2; } }
+      );
+      c.skills.find(s => s.id === "backstab").startOnly = true; // backstab only works on an unengaged target: once per fight
+      if (subKey === "rogue") {
+        c.quickRecovery = 0.625; // Rogue SC5 Quick Recovery: lag -1 with chance(number(50,75)), expected 62.5%
+        const pTrip = chance(111, D + 5 + D / 2); // Trip (SC4, toggle on): after a successful Circle, number(1,111)-dex_app-Vehemence <= learned TRIP -> stun
+        c.skills.find(s => s.id === "circle").posEV = 1 + pTrip; // expected next-round multiplier: standing, or stunned (x2) with chance pTrip
+      }
+      break;
+    }
+    // ---------------- Warrior ----------------
+    case "warlord": {
+      const jv = Math.min(1, dualVal / 249), jt = Math.min(1, dualVal / 246), jq = Math.min(1, dualVal / 234); // Juggernaut checks
+      c.hits = 1 + jv + jv * jt + jv * jt * jq;
+      c.skills.push(
+        { id: "punch", name: "Punch (Iron Fist)", cd: 2, posEV: 0.67 * 1.3333 + 0.33 * 2, ev: () => pKick * (0.67 * LEVEL * 2 + 0.33 * LEVEL * 4), use: () => { c.totals.skill += pKick * (0.67 * LEVEL * 2 + 0.33 * LEVEL * 4); } }, // sets sitting(1.3333) or Iron Fist stun(2)
+        { id: "kick", name: "Kick", cd: 2, ev: () => pKick * LEVEL * 2, use: () => { c.totals.skill += pKick * LEVEL * 2; } }
+      );
+      break;
+    }
+    case "gladiator": {
+      const dv = dualVal / 174, tv = Math.min(1, dualVal / 202), qv = Math.min(1, dualVal / 192); // Hostile checks
+      c.hits = 1 + Math.min(1, dv) + Math.min(1, dv) * tv + Math.min(1, dv) * tv * qv;
+      c.skills.push(
+        { id: "flank", name: "Flank", cd: 2, startOnly: true, ev: () => pDex * (M * (LEVEL / 10) + c.maimBonus()),
+          use: () => { c.totals.skill += pDex * (M * (LEVEL / 10) + c.maimBonus()); if (pDex > 0) c.maimed = true; } }, // dam*(level/10) only when joining the fight (no current opponent); no position change; applies Maim
+        { id: "headbutt", name: "Headbutt", cd: 2, posEV: 2, ev: () => pHeadbutt * (LEVEL * 4 + c.maimBonus()), use: () => { c.totals.skill += pHeadbutt * (LEVEL * 4 + c.maimBonus()); } }
+      );
+      break;
+    }
+    // ---------------- Ninja ----------------
+    case "ronin": {
+      c.hits = 2; c.crit = 0.20; // Sento Kata (SC5): crit on roll >= 17
+      c.skills.push(
+        { id: "backfist", name: "Backfist", cd: 2, posEV: 2, ev: () => pDex * LEVEL * 1.625, use: () => { c.totals.skill += pDex * LEVEL * 1.625; } },
+        { id: "banzai", name: "Banzai", cd: 1, extraBasic: true, mana: () => 75 * pDex + 37.5 * (1 - pDex), ev: () => pDex * (250 + M),
+          use: () => { c.totals.skill += pDex * (250 + M); } }
+      );
+      c.spells.push({ id: "divinewind", name: "Divine Wind", mana: 65, ev: () => 300, cast: () => { c.mana -= 65; c.totals.spell += 300; } });
+      c.swiftChance = (50 + D * 2.5) / 100; // chance(50 + dex_app*2.5) bonus attack after 2nd hit
+      c.buffs.push({ id: "swiftness", name: "Mystic Swiftness", mana: 100, dur: 4 * TICK_ROUNDS,
+        ev: () => c.swiftChance * p ** 3 * c.perHit() * (1 + c.crit) * 4 * TICK_ROUNDS });
+      break;
+    }
+    case "mystic": {
+      c.hits = 2;
+      c.skills.push({ id: "tigerkick", name: "Tigerkick", cd: 2, posEV: 2, ev: () => pDex * LEVEL * 1.75, use: () => { c.totals.skill += pDex * LEVEL * 1.75; } });
+      c.buffs.push({ id: "tranquility", name: "Tranquility (group)", mana: 150, dur: 6 * TICK_ROUNDS, groupBuff: true,
+        ev: () => 3 * group.totalHits() * 6 * TICK_ROUNDS });
+      break;
+    }
+    // ---------------- Nomad ----------------
+    case "ranger": {
+      const dv = Math.min(1, dualVal / 298); // Berserk grants AFF_DUAL
+      c.hits = 1 + dv + (1 - dv) * (40 + D) / 100; // Berserk extra-hit check: chance(40+dex_app)
+      c.crit = Math.min(1, 0.20 + 2 * Math.max(0, Math.min(inputs.dex, 25) - 18) / 100 + 0.10 + 0.10); // Awareness + Berserk
+      c.skills.push({ id: "kick", name: "Kick", cd: 2, ev: () => pKick * LEVEL * 2, use: () => { c.totals.skill += pKick * LEVEL * 2; } });
+      break;
+    }
+    case "trapper": {
+      const dv = Math.min(1, dualVal / 298); // Frenzy grants AFF_DUAL
+      c.hits = 1 + dv + (1 - dv) * (10 + D) / 100; // Frenzy extra-hit check: chance(10+dex_app)
+      c.crit = Math.min(1, 0.20 + 2 * Math.max(0, Math.min(inputs.dex, 25) - 18) / 100);
+      c.dmgMult = 1.5; // Frenzy: weapon damage x1.5 (fight.c:1925)
+      c.skills.push(
+        { id: "batter", name: "Batter", cd: 2, posEV: 1.3333, ev: () => pDex * LEVEL * 2, use: () => { c.totals.skill += pDex * LEVEL * 2; } }, // sets victim sitting
+        { id: "kick", name: "Kick", cd: 2, ev: () => pKick * LEVEL * 2, use: () => { c.totals.skill += pKick * LEVEL * 2; } }
+      );
+      break;
+    }
+    // ---------------- Paladin ----------------
+    case "cavalier": {
+      c.dmgMult = 2.5; // Fury: paladin spec auto-applies AFF_FURY (char_spec.c:746); level 50 max-alignment fury = x2.5 weapon damage (fight.c:1913)
+      c.skills.push(
+        { id: "pummel", name: "Pummel (+Steed)", cd: 2, posEV: 1.5, ev: () => pDex * (10 + LEVEL * 1.5 * 2), use: () => { c.totals.skill += pDex * (10 + LEVEL * 1.5 * 2); } }, // steed tramples the stunned victim (x2) then leaves it resting
+        { id: "kick", name: "Kick", cd: 2, ev: () => pKick * LEVEL * 2, use: () => { c.totals.skill += pKick * LEVEL * 2; } },
+        { id: "smite", name: "Smite (+Steed)", cd: 2, posEV: 1.5, ev: () => pStrW * (c.perHit() + 2 * c.perHit()), use: () => { c.totals.skill += pStrW * (c.perHit() + 2 * c.perHit()); } } // base hit x2.5 fury + steed extra basic attack x2 (stunned) = 5x; leaves victim resting
+      );
+      c.buffs.push({ id: "might", name: "Might", mana: 50, dur: 20 * TICK_ROUNDS, flat: 3, ev: () => 3 * c.hits * 20 * TICK_ROUNDS });
+      c.spells.push({ id: "wrathofgod", name: "Wrath of God", mana: 100, ev: () => 600, cast: () => { c.mana -= 100; c.totals.spell += 600; } });
+      break;
+    }
+    case "crusader": {
+      c.dmgMult = 2.5; // Fury: paladin class spec (char_spec.c:740) applies to both subclasses; a pummel'd victim takes x2 on the next hit -> 2.5 x 2 = 5x
+      const pZeal = chance(101, W);
+      c.skills.push(
+        { id: "pummel", name: "Pummel", cd: 2, posEV: 2, ev: () => pDex * 10, use: () => { c.totals.skill += pDex * 10; } },
+        { id: "kick", name: "Kick", cd: 2, ev: () => pKick * LEVEL * 2, use: () => { c.totals.skill += pKick * LEVEL * 2; } },
+        { id: "zeal", name: "Zeal (AoE)", cd: 2, ev: () => pZeal * M, use: () => { c.totals.skill += pZeal * M; } }
+      );
+      c.buffs.push({ id: "righteousness", name: "Righteousness", mana: 30, dur: 10 * TICK_ROUNDS, flat: 2.5, ev: () => 2.5 * c.hits * 10 * TICK_ROUNDS }); // +1d4 vs neutral target
+      break;
+    }
+    // ---------------- Anti-Paladin ----------------
+    case "defiler":
+    case "infidel": {
+      c.skills.push(
+        { id: "pummel", name: "Pummel", cd: 2, posEV: 2, ev: () => pDex * 10, use: () => { c.totals.skill += pDex * 10; } },
+        { id: "kick", name: "Kick", cd: 2, ev: () => pKick * LEVEL * 2, use: () => { c.totals.skill += pKick * LEVEL * 2; } },
+        { id: "bash", name: "Bash", cd: 2, posEV: 1.5, ev: () => pBash * 25.5, use: () => { c.totals.skill += pBash * 25.5; } }
+      );
+      c.buffs.push({ id: "rage", name: "Rage", prio: true, mana: 130, dur: 5 * TICK_ROUNDS, mult: 1.5, ev: () => 0.5 * c.perHit() * c.hits * 5 * TICK_ROUNDS });
+      if (subKey === "infidel") {
+        c.buffs.push({ id: "shadowwraith", name: "Shadow Wraith", mana: () => 100 + 20 * c.shadows, dur: 10 * TICK_ROUNDS, shadow: true, prio: 90, // each shadow lasts 10 ticks
+          ev: () => c.perHit() * 10 * HIT_CHANCE });
+        c.spells.push(
+          { id: "duskrequiem", name: "Dusk Requiem", mana: 20, prio: 100, ev: () => c.shadows > 0 ? 350 * c.shadows : 0,
+            cast: () => { if (c.shadows <= 0) return; c.mana -= 20; c.shadows--; c.totals.spell += 350 * (c.shadows + 1); } },
+          { id: "wither", name: "Wither", mana: 70, ev: () => 350 + 4 * 75, cast: () => { c.mana -= 70; c.totals.spell += 350 + 4 * 75; } } // 350 + 4 pulses x 75
+        );
+      }
+      break;
+    }
+    // ---------------- Bard ----------------
+    case "bladesinger": {
+      const q2b = Math.min(1, dualVal / 298);
+      c.hits = p + hasteChance * p * p + p * (1 - hasteChance + hasteChance * p) * q2b * p; // hasted + dual
+      c.dmgMult = 1.2; // Showmanship (SC2): +5% per grouped ally (4 allies)
+      c.spells.push({ id: "bladedance", name: "Blade Dance", mana: 80, dur: 10,
+        ev: () => 350 + c.basicEV() + 40 * c.hits * 10, // 350 sound dmg + one full basic attack; refreshes Bladesinging (+40 damroll = mana/2) for 10 rounds (ENCH_INTERVAL_ROUND)
+        cast: () => { c.mana -= 80; c.totals.spell += 350; c.totals.basic += c.basicEV(); } });
+      break;
+    }
+    case "chanter": {
+      const q2c = Math.min(1, dualVal / 298);
+      c.hits = p + hasteChance * p * p + p * (1 - hasteChance + hasteChance * p) * q2c * p; // hasted + dual
+      c.buffs.push(
+        { id: "warchant", name: "War Chant", mana: 60, dur: 5 * TICK_ROUNDS, mult: 1.2, ev: () => 0.2 * c.basicEV() * 5 * TICK_ROUNDS }, // x1.2 vs un-chanter victim
+        { id: "aid", name: "Aid (group)", mana: 150, dur: 5 * TICK_ROUNDS, onCast: r => { group.aidUntil = r + 5 * TICK_ROUNDS; }, ev: () => 0.1 * group.totalBasicEV() * 5 * TICK_ROUNDS }
+      );
+      break;
+    }
+    // ---------------- Commando ----------------
+    case "legionnaire":
+    case "mercenary": {
+      c.hits = 1 + Math.min(1, dualVal / 298) + Math.min(1, dualVal / 298) * Math.min(1, dualVal / 283); // dual + triple
+      const pLunge = chance(137, D + 5);
+      c.skills.push(
+        { id: "pummel", name: "Pummel", cd: 2, posEV: 2, ev: () => pDex * 10, use: () => { c.totals.skill += pDex * 10; } },
+        { id: "kick", name: "Kick", cd: 2, ev: () => pKick * LEVEL * 2, use: () => { c.totals.skill += pKick * LEVEL * 2; } },
+        { id: "bash", name: "Bash", cd: 2, posEV: 1.5, ev: () => pBash * 25.5, use: () => { c.totals.skill += pBash * 25.5; } }
+      );
+      if (subKey === "legionnaire") {
+        c.skills.push(
+          { id: "lunge", name: "Lunge", cd: 2, ev: () => pLunge * M * 9, use: () => { c.totals.skill += pLunge * M * 9; } }, // assault_mult[50]=7, lround(7*1.25)=9
+          { id: "clobber", name: "Clobber", cd: 2, posEV: 2.2083, ev: () => pClobber * LEVEL * 2.5, use: () => { c.totals.skill += pClobber * LEVEL * 2.5; } } // number(50,200) avg; victim state avg (25% MW x2.5 + 25% incap x2.333 + 50% stun x2)
+        );
+        c.spells.push(
+          { id: "rimefang", name: "Rimefang (AoE)", mana: 115, ev: () => 6 * LEVEL, cast: () => { c.mana -= 115; c.totals.spell += 6 * LEVEL; } }, // number(5,7)*50 avg
+          { id: "devastation", name: "Devastation", mana: 150, ev: () => 1000, cast: () => { c.mana -= 150; c.totals.spell += 1000; } }
+        );
+      } else {
+        c.spells.push(
+          { id: "tremor", name: "Tremor (AoE)", mana: 130, ev: () => 400, cast: () => { c.mana -= 130; c.totals.spell += 400; } },
+          { id: "incendiary", name: "Incendiary Cloud", mana: 200, ev: () => 500 + 10 * 150, cast: () => { c.mana -= 200; c.totals.spell += 500 + 10 * 150; } } // 500 + 10 rounds x 150
+        );
+      }
+      break;
+    }
+  }
+
+  // ---------- damage helpers ----------
+  c.maimBonus = () => (c.maimed ? LEVEL / 4 : 0); // Gladiator SC3 Maim: permanent +level/4 to skill attacks
+  c.flatBonus = () => {
+    let f = 0;
+    if (c.closeCombat) f += c.closeCombat;
+    if (group.tranqUntil > group.round) f += 3;           // Tranquility: +3 damroll, all members
+    if (c.buffEnds["bladedance"] > group.round) f += 40;  // Bladesinging: +song-mana/2 damroll while active
+    for (const b of c.buffs) if (b.flat && c.buffEnds[b.id] > group.round) f += b.flat;
+    return f;
+  };
+  c.multBonus = () => {
+    let m = c.dmgMult;
+    if (group.aidUntil > group.round) m *= 1.1; // Aid (Chanter SC4): +10% of all damage, whole group
+    for (const b of c.buffs) if (b.mult && c.buffEnds[b.id] > group.round) m *= b.mult;
+    return m;
+  };
+  c.perHit = () => Math.max(0, (M + c.flatBonus()) * c.multBonus());
+  c.basicEV = () => {
+    let ev = c.hits * c.perHit() * (1 + c.crit);
+    if (c.passiveDragon) ev += c.hits * ((20 + W) / 100) * LEVEL * HIT_CHANCE; // dragon form post-hit extra attack
+    if (c.buffEnds["swiftness"] > group.round) ev += (c.swiftChance || 0) * p ** 3 * c.perHit() * (1 + c.crit); // Mystic Swiftness bonus hit
+    if (c.shadows > 0) ev += c.shadows * HIT_CHANCE * c.perHit() * (1 + c.crit);                 // Shadow Wraith: one extra attack per shadow
+    if (c.hammer && c.hammer.endRound > group.round) ev += (20 + c.flatBonus()) * HIT_CHANCE;  // Divine Hammer extra basic attack each round (5d5+5 avg 20 + damroll)
+    return ev;
+  };
+
+  return c;
+}
+
+// ============================ Simulation ============================
+function simulate(subKeys, inputs) {
+  const group = {
+    members: [], round: 0, tranqUntil: 0, aidUntil: 0,
+    totalHits: () => group.members.reduce((s, m) => s + m.hits, 0),
+    totalBasicEV: () => group.members.reduce((s, m) => s + m.basicEV(), 0),
+  };
+  for (const k of subKeys) group.members.push(makeChar(k, inputs, group));
+
+  const manaRegen = inputs.manaRegen;
+
+  for (let r = 1; r <= TOTAL_ROUNDS; r++) {
+    group.round = r;
+
+    // mana regen every 60s (20 rounds)
+    if (r % 20 === 0) for (const c of group.members) c.mana = Math.min(c.maxMana, c.mana + manaRegen);
+
+    for (const c of group.members) {
+      // expire shadows (Infidel): each shadow lasts 10 ticks = 200 rounds from its cast
+      if (c.key === "infidel" && c.shadowEnds) {
+        const before = c.shadows;
+        c.shadowEnds = c.shadowEnds.filter(e => e > r);
+        c.shadows = c.shadowEnds.length;
+      }
+
+      // Divine Hammer judgement strike at end of its 60 rounds
+      if (c.hammer && !c.hammer.judged && c.hammer.endRound <= r) {
+        c.totals.spell += 900;
+        c.hammer.judged = true;
+        c.actionCounts["Judgement Strike"] = (c.actionCounts["Judgement Strike"] || 0) + 1;
+      }
+
+      // ---- every character makes their basic multi-strike attack every round ----
+      // A stunning skill from a previous round leaves the target downed: this attack gets the position multiplier.
+      c.totals.basic += c.basicEV() * (c.nextMult || 1);
+      c.actionCounts["Basic attack"] = (c.actionCounts["Basic attack"] || 0) + 1;
+      c.nextMult = 1;
+
+      // ---- priority extra actions (bypass EV comparison): e.g. Infidel keeps 4 shadows topped up, then spends mana on Dusk Requiem ----
+      let acted = false;
+      for (const b of c.buffs) {
+        if (!b.prio) continue;
+        if (!b.shadow && c.buffEnds[b.id] > r) continue; // shadows are tracked individually in shadowEnds: keep recasting while below 4
+        const cost = typeof b.mana === "function" ? b.mana() : b.mana;
+        if (b.shadow && c.shadows >= 4) continue;
+        if (c.mana < cost) continue;
+        c.mana -= cost;
+        c.buffEnds[b.id] = r + b.dur;
+        if (b.shadow) { c.shadows++; (c.shadowEnds = c.shadowEnds || []).push(r + b.dur); }
+        if (b.onCast) b.onCast(r);
+        c.actionCounts[b.name] = (c.actionCounts[b.name] || 0) + 1;
+        acted = true;
+        break;
+      }
+      if (!acted) for (const sp of c.spells) {
+        if (!sp.prio) continue;
+        if (c.mana < sp.mana) continue;
+        if (sp.ev() <= 0) continue;
+        let saving = false; // save up for an expired priority buff (e.g. Infidel -> Rage)
+        for (const b of c.buffs) {
+          const bc = typeof b.mana === "function" ? b.mana() : b.mana;
+          if (b.prio && !b.shadow && c.buffEnds[b.id] <= r && c.mana < bc) saving = true;
+        }
+        if (saving) continue;
+        sp.cast();
+        c.actionCounts[sp.name] = (c.actionCounts[sp.name] || 0) + 1;
+        acted = true;
+        break;
+      }
+      if (acted) continue;
+
+      // ---- choose the best EXTRA action this round (expected value; basic attack already happened) ----
+      let best = null;
+      const consider = (ev, prio, act) => {
+        if (ev <= 0) return;
+        if (!best || ev > best.ev + 1e-9 || (Math.abs(ev - best.ev) <= 1e-9 && prio > best.prio)) best = { ev, prio, act };
+      };
+
+      // buffs (prio 0)
+      for (const b of c.buffs) {
+        if (!b.shadow && c.buffEnds[b.id] > r) continue; // shadows are tracked individually in shadowEnds: keep recasting while below 4
+        const cost = typeof b.mana === "function" ? b.mana() : b.mana;
+        if (b.shadow && c.shadows >= 4) continue;
+        if (c.mana < cost) continue;
+        consider(b.ev(), 0, () => {
+          c.mana -= cost;
+          c.buffEnds[b.id] = r + b.dur;
+          if (b.shadow) { c.shadows++; (c.shadowEnds = c.shadowEnds || []).push(r + b.dur); }
+          if (b.groupBuff) group.tranqUntil = r + b.dur;
+          if (b.onCast) b.onCast(r);
+          c.actionCounts[b.name] = (c.actionCounts[b.name] || 0) + 1;
+        });
+      }
+
+      // skills (prio 2) - deterministic expected value: ev() already includes success chance.
+      // Stun/position skills (posEV) also add the value of buffing next round's basic attack.
+      // All skills share ONE lag timer: after any skill, no command works until its WAIT_STATE elapses.
+      if (r >= c.nextSkill) for (const s of c.skills) {
+        if (s.startOnly && r !== 1) continue; // usable only at the start of the fight
+        const cost = typeof s.mana === "function" ? s.mana() : (s.mana || 0);
+        if (c.mana < cost) continue;
+        const rageM = (c.buffEnds["rage"] || 0) > r ? 1.5 : 1; // Rage: x1.5 all damage while active
+        const ev = s.ev() * rageM * HIT_CHANCE + (s.posEV ? (s.posEV - 1) * c.basicEV() : 0) + (s.extraBasic ? c.basicEV() * HIT_CHANCE : 0); // Banzai: extra full basic-attack round
+        consider(ev, 2, () => {
+          c.nextSkill = r + Math.max(1, s.cd - (c.quickRecovery || 0));
+          if (cost) c.mana -= cost;
+          s.use();
+          if (rageM > 1) c.totals.skill += s.ev() * (rageM - 1);
+          if (s.extraBasic) c.totals.basic += c.basicEV();
+          if (s.posEV) c.nextMult = s.posEV;
+          c.actionCounts[s.name] = (c.actionCounts[s.name] || 0) + 1;
+        });
+      }
+
+      // spells (prio 1); buff-like spells (with dur) don't stack - recast only after they expire
+      for (const sp of c.spells) {
+        if (sp.startOnly && r !== 1) continue; // usable only at the start of the fight
+        if ((c.buffEnds[sp.id] || 0) > r) continue;
+        if (c.mana < sp.mana) continue;
+        const ev = sp.ev() * HIT_CHANCE;
+        if (ev <= 0) continue;
+        consider(ev, 1, () => { sp.cast(); if (sp.dur) c.buffEnds[sp.id] = r + sp.dur; c.actionCounts[sp.name] = (c.actionCounts[sp.name] || 0) + 1; });
+      }
+
+      if (best) best.act();
+    }
+  }
+
+  // Apply the 5% miss chance to all damage dealt. A uniform multiplier scales every
+  // action's expected value equally, so it cannot change which actions were chosen —
+  // applying it once here is identical to each individual attack missing 5% of the time.
+  for (const c of group.members) {
+    c.totals.basic *= HIT_CHANCE;
+    c.totals.skill *= HIT_CHANCE;
+    c.totals.spell *= HIT_CHANCE;
+    c.totals.passive *= HIT_CHANCE;
+  }
+
+  return group;
+}
+
+// ============================ UI ============================
+const membersDiv = document.getElementById("members");
+for (let i = 0; i < 5; i++) {
+  const row = document.createElement("div");
+  row.className = "member-row";
+  const lab = document.createElement("label");
+  lab.textContent = "Member " + (i + 1);
+  const sel = document.createElement("select");
+  sel.id = "member" + i;
+  for (const sc of SUBCLASSES) {
+    const opt = document.createElement("option");
+    opt.value = sc.key;
+    opt.textContent = sc.label + " (" + sc.cls + ")";
+    sel.appendChild(opt);
+  }
+  row.appendChild(lab); row.appendChild(sel);
+  membersDiv.appendChild(row);
+}
+// default group: one of each flavor
+["ronin", "archmage", "gladiator", "cavalier", "infidel"].forEach((k, i) => { document.getElementById("member" + i).value = k; });
+
+function fmt(n) { return Math.round(n).toLocaleString("en-US"); }
+
+document.getElementById("runBtn").addEventListener("click", () => {
+  const inputs = {
+    melee: Math.max(1, parseInt(document.getElementById("melee").value, 10) || 120),
+    dex: Math.min(25, Math.max(3, parseInt(document.getElementById("dex").value, 10) || 25)),
+    wis: Math.min(25, Math.max(3, parseInt(document.getElementById("wis").value, 10) || 25)),
+    skills: Math.max(0, parseInt(document.getElementById("skills").value, 10) || 127),
+    manaRegen: Math.max(0, parseInt(document.getElementById("manaregen").value, 10) || 0),
+  };
+  inputs.dexApp = tableLookup(DEX_APP_TABLE, inputs.dex);
+  inputs.wisBonus = tableLookup(WIS_BONUS_TABLE, inputs.wis);
+
+  const subKeys = [];
+  for (let i = 0; i < 5; i++) subKeys.push(document.getElementById("member" + i).value);
+
+  const group = simulate(subKeys, inputs);
+
+  // ---- render table ----
+  document.getElementById("resultsPlaceholder").style.display = "none";
+  document.getElementById("results").style.display = "block";
+
+  let total = { basic: 0, skill: 0, spell: 0, passive: 0, all: 0 };
+  const rows = group.members.map((c, i) => {
+    const sum = c.totals.basic + c.totals.skill + c.totals.spell + c.totals.passive;
+    total.basic += c.totals.basic; total.skill += c.totals.skill; total.spell += c.totals.spell; total.all += sum;
+    const acts = Object.entries(c.actionCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([n, n2]) => n + " \u00d7" + n2).join(", ");
+    return { c, sum, acts };
+  });
+
+  let html = "<tr><th>Member</th><th>Total Damage</th><th>DPS</th><th>Basic Attacks</th><th>Skills</th><th>Spells</th><th>Actions (600s)</th></tr>";
+  rows.forEach((r, i) => {
+    html += `<tr>
+      <td>${i + 1}. ${r.c.label} <span class="tag">${r.c.cls}</span></td>
+      <td><b>${fmt(r.sum)}</b></td>
+      <td>${(r.sum / 600).toFixed(1)}/s</td>
+      <td>${fmt(r.c.totals.basic)}</td>
+      <td>${fmt(r.c.totals.skill)}</td>
+      <td>${fmt(r.c.totals.spell)}</td>
+      <td class="actions">${r.acts || "\u2014"}</td>
+    </tr>`;
+  });
+  html += `<tr class="total-row">
+    <td>Group Total</td>
+    <td>${fmt(total.all)}</td>
+    <td>${(total.all / 600).toFixed(1)}/s</td>
+    <td>${fmt(total.basic)}</td>
+    <td>${fmt(total.skill)}</td>
+    <td>${fmt(total.spell)}</td>
+    <td class="actions"></td>
+  </tr>`;
+  document.getElementById("resultTable").innerHTML = html;
+
+  // ---- solo table: every subclass simulated alone with the same inputs ----
+  const solo = SUBCLASSES.map(sc => {
+    const g = simulate([sc.key], inputs);
+    const c = g.members[0];
+    return { sc, c, sum: c.totals.basic + c.totals.skill + c.totals.spell + c.totals.passive };
+  }).sort((a, b) => b.sum - a.sum);
+
+  let soloHtml = "<tr><th>#</th><th>Subclass</th><th>Total Damage</th><th>DPS</th><th>Basic Attacks</th><th>Skills</th><th>Spells</th><th>Actions (600s)</th></tr>";
+  solo.forEach((s, i) => {
+    const inGroup = subKeys.includes(s.sc.key);
+    const acts = Object.entries(s.c.actionCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([n, n2]) => n + " \u00d7" + n2).join(", ");
+    soloHtml += `<tr${inGroup ? ' style="background:var(--panel2)"' : ''}>
+      <td>${i + 1}</td>
+      <td>${s.sc.label} <span class="tag">${s.sc.cls}</span>${inGroup ? ' <span class="tag">group</span>' : ''}</td>
+      <td><b>${fmt(s.sum)}</b></td>
+      <td>${(s.sum / 600).toFixed(1)}/s</td>
+      <td>${fmt(s.c.totals.basic)}</td>
+      <td>${fmt(s.c.totals.skill)}</td>
+      <td>${fmt(s.c.totals.spell)}</td>
+      <td class="actions">${acts || "\u2014"}</td>
+    </tr>`;
+  });
+  document.getElementById("soloTable").innerHTML = soloHtml;
+
+  // ---- bars ----
+  const maxSum = Math.max(...rows.map(r => r.sum), 1);
+  let bars = "";
+  rows.forEach((r, i) => {
+    bars += `<div class="bar-row">
+      <div class="bar-label">${i + 1}. ${r.c.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(r.sum / maxSum * 100).toFixed(1)}%"></div></div>
+      <div class="bar-val">${fmt(r.sum)}</div>
+    </div>`;
+  });
+  document.getElementById("bars").innerHTML = bars;
+});
+
+// run once on load with defaults
+document.getElementById("runBtn").click();
+</script>
+</body>
+</html>

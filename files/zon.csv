@@ -6666,22 +6666,14 @@ ZoneNumber,ZoneName,FileName,zonCreationDate,zonUpdateDate,zonAuthor,respawnTime
 286,"Olympus Puzzles, by Nosferatu",../ronin/lib/world/OlympusPuzzlesbyNosferatu.zon,Unknown,27Jun2021,Nosferatu,45,Reset when empty,28699,28600,1,28602,normal,,,,,,,100,100,100,100,100,100,100,100
 286,"Olympus Puzzles, by Nosferatu",../ronin/lib/world/OlympusPuzzlesbyNosferatu.zon,Unknown,27Jun2021,Nosferatu,45,Reset when empty,28699,,,,,,,,,,,100,100,100,100,100,100,100,100
 286,"Olympus Puzzles, by Nosferatu",../ronin/lib/world/OlympusPuzzlesbyNosferatu.zon,Unknown,27Jun2021,Nosferatu,45,Reset when empty,28699,,,,,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,,,,,19612,,ObjectToMob,19606,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,19606,1,19601,normal,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,,,,,19611,,ObjectToMob,19606,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,19606,1,19601,normal,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,,,,,19610,,ObjectToMob,19606,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,19606,1,19601,normal,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,,,,,19609,,ObjectToMob,19606,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,19606,1,19601,normal,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,19605,1,19615,normal,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,19604,1,19613,normal,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,19603,1,19611,normal,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,19602,1,19605,normal,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,19601,1,19609,normal,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,19600,1,19601,normal,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,,,,,,,,,,,100,100,100,100,100,100,100,100
-196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,2Sep2026,Geldrin,120,Reset when empty,19699,,,,,,,,,,,100,100,100,100,100,100,100,100
+196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,21Aug2026,Geldrin,120,Reset when empty,19699,19605,1,19615,normal,,,,,,,100,100,100,100,100,100,100,100
+196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,21Aug2026,Geldrin,120,Reset when empty,19699,19604,1,19613,normal,,,,,,,100,100,100,100,100,100,100,100
+196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,21Aug2026,Geldrin,120,Reset when empty,19699,19603,1,19611,normal,,,,,,,100,100,100,100,100,100,100,100
+196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,21Aug2026,Geldrin,120,Reset when empty,19699,19602,1,19605,normal,,,,,,,100,100,100,100,100,100,100,100
+196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,21Aug2026,Geldrin,120,Reset when empty,19699,19601,1,19609,normal,,,,,,,100,100,100,100,100,100,100,100
+196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,21Aug2026,Geldrin,120,Reset when empty,19699,19600,1,19601,normal,,,,,,,100,100,100,100,100,100,100,100
+196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,21Aug2026,Geldrin,120,Reset when empty,19699,,,,,,,,,,,100,100,100,100,100,100,100,100
+196,Ossuary of the Fallen Titan,../ronin/lib/world/OssuaryoftheFallenTitan.zon,24Apr2026,21Aug2026,Geldrin,120,Reset when empty,19699,,,,,,,,,,,100,100,100,100,100,100,100,100
 69,Quest Gear,../ronin/lib/world/QuestGear.zon,Unknown,8Jun2020,Unknown,10,Never reset,6999,,,,,,,,,,,100,100,100,100,100,100,100,100
 69,Quest Gear,../ronin/lib/world/QuestGear.zon,Unknown,8Jun2020,Unknown,10,Never reset,6999,,,,,,,,,,,100,100,100,100,100,100,100,100
 10,Quest Gear II,../ronin/lib/world/QuestGearII.zon,4Nov2008,16Nov2020,Jearom,10,Never reset,1099,,,,,,,,,,,100,100,100,100,100,100,100,100
